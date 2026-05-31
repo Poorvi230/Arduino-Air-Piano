@@ -7,7 +7,7 @@ int lastNote = -1;
 float smoothedDistance = 0;
 
 unsigned long lastDetectionTime = 0;
-const int holdTime = 200; // milliseconds
+const int holdTime = 350; // keeps note alive briefly
 
 void setup() {
   Serial.begin(115200);
@@ -18,7 +18,7 @@ void setup() {
 
 void loop() {
 
-  // Trigger ultrasonic pulse
+  // Send ultrasonic pulse
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
 
@@ -27,21 +27,22 @@ void loop() {
 
   digitalWrite(trigPin, LOW);
 
-  // Read sensor
+  // Read echo
   long duration = pulseIn(echoPin, HIGH);
 
+  // Convert to distance
   float distance = duration * 0.034 / 2;
 
   // Smooth sensor readings
   smoothedDistance =
-      (smoothedDistance * 0.8) +
-      (distance * 0.2);
+      (smoothedDistance * 0.9) +
+      (distance * 0.1);
 
   distance = smoothedDistance;
 
   currentNote = -1;
 
-  // Note mapping
+  // Note ranges
   if (distance >= 10 && distance < 20) {
     currentNote = 60; // C
 
@@ -80,7 +81,7 @@ void loop() {
     }
   }
 
-  // Only turn off after short delay
+  // Turn note off only after delay
   if (lastNote != -1 &&
       millis() - lastDetectionTime > holdTime) {
 
@@ -88,14 +89,14 @@ void loop() {
     lastNote = -1;
   }
 
-  delay(80);
+  delay(120);
 }
 
 // MIDI Note ON
 void noteOn(int note) {
   Serial.write(0x90);
   Serial.write(note);
-  Serial.write(120);
+  Serial.write(100);
 }
 
 // MIDI Note OFF
