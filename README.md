@@ -59,9 +59,9 @@ Arduino → Hairless MIDI → loopMIDI → LMMS → Speakers
 
 ## Project Setup
 
-![Setup](images/setup.jpeg)
+![Setup](images/Setup.jpeg)
 
-![Updated Setup](images/setup2.0.jpeg)
+![Updated Setup](images/Setup2.0.jpeg)
 
 ## Future Improvements
 
