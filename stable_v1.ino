@@ -9,14 +9,16 @@ const int led4 = 5;
 const int led5 = 6;
 
 int currentNote = -1;
+int stableNote = -1;
 int lastNote = -1;
 
 float smoothedDistance = 0;
 
 unsigned long lastDetectionTime = 0;
-const int holdTime = 150;
+const int holdTime = 140;
 
 void setup() {
+
   Serial.begin(115200);
 
   pinMode(trigPin, OUTPUT);
@@ -31,7 +33,7 @@ void setup() {
 
 void loop() {
 
-  // Ultrasonic pulse
+  // Trigger ultrasonic pulse
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
 
@@ -40,58 +42,112 @@ void loop() {
 
   digitalWrite(trigPin, LOW);
 
-  long duration = pulseIn(echoPin, HIGH);
+  long duration = pulseIn(echoPin, HIGH, 20000);
+
+  // No hand detected
+  if (duration == 0) {
+    stopCurrentNote();
+    return;
+  }
 
   float distance = duration * 0.034 / 2;
 
-  // Smooth readings
+  // Ignore bad readings
+  if (distance < 8 || distance > 72) {
+    stopCurrentNote();
+    return;
+  }
+
+  // Balanced smoothing
   smoothedDistance =
-      (smoothedDistance * 0.9) +
-      (distance * 0.1);
+      (smoothedDistance * 0.78) +
+      (distance * 0.22);
 
   distance = smoothedDistance;
 
   currentNote = -1;
 
-  // Note mapping
-  if (distance >= 10 && distance < 20) {
-    currentNote = 60; // C
+  // -------- NOTE ZONES --------
+
+  // C
+  if (distance >= 10 && distance < 17) {
+
+    currentNote = 60;
     showLevel(1);
 
-  } else if (distance >= 20 && distance < 30) {
-    currentNote = 62; // D
+  // D
+  } else if (distance >= 17 && distance < 24) {
+
+    if (stableNote == 60 && distance < 19)
+      currentNote = 60;
+    else
+      currentNote = 62;
+
     showLevel(2);
 
-  } else if (distance >= 30 && distance < 40) {
-    currentNote = 64; // E
+  // E
+  } else if (distance >= 24 && distance < 31) {
+
+    if (stableNote == 62 && distance < 26)
+      currentNote = 62;
+    else
+      currentNote = 64;
+
     showLevel(3);
 
-  } else if (distance >= 40 && distance < 50) {
-    currentNote = 65; // F
+  // F
+  } else if (distance >= 31 && distance < 38) {
+
+    if (stableNote == 64 && distance < 33)
+      currentNote = 64;
+    else
+      currentNote = 65;
+
     showLevel(4);
 
-  } else if (distance >= 50 && distance < 58) {
-    currentNote = 67; // G
+  // G (wider range)
+  } else if (distance >= 38 && distance < 48) {
+
+    if (stableNote == 65 && distance < 41)
+      currentNote = 65;
+    else
+      currentNote = 67;
+
     showLevel(5);
 
-  } else if (distance >= 58 && distance < 66) {
-    currentNote = 69; // A
-    pulseLEDs();
+  // A (wider range)
+  } else if (distance >= 48 && distance < 58) {
 
-  } else if (distance >= 66 && distance < 74) {
-    currentNote = 71; // B
-    blinkLEDs();
+    if (stableNote == 67 && distance < 51)
+      currentNote = 67;
+    else
+      currentNote = 69;
+
+    showLevel(5);
+
+  // B (widest range)
+  } else if (distance >= 58 && distance < 70) {
+
+    if (stableNote == 69 && distance < 61)
+      currentNote = 69;
+    else
+      currentNote = 71;
+
+    showLevel(5);
 
   } else {
     turnOffLEDs();
   }
 
-  // MIDI note logic
+  // -------- MIDI --------
+
   if (currentNote != -1) {
 
     lastDetectionTime = millis();
 
-    if (currentNote != lastNote) {
+    if (currentNote != stableNote) {
+
+      stableNote = currentNote;
 
       if (lastNote != -1) {
         noteOff(lastNote);
@@ -102,20 +158,18 @@ void loop() {
     }
   }
 
+  // Hand removed
   if (lastNote != -1 &&
-    millis() - lastDetectionTime > holdTime) {
+      millis() - lastDetectionTime > holdTime) {
 
-  noteOff(lastNote);
-  lastNote = -1;
+    stopCurrentNote();
+  }
 
-  // Turn all LEDs off
-  turnOffLEDs();
+  delay(20);
 }
 
-  delay(120);
-}
+// -------- LED FUNCTIONS --------
 
-// LED equalizer
 void showLevel(int level) {
 
   digitalWrite(led1, level >= 1);
@@ -125,37 +179,8 @@ void showLevel(int level) {
   digitalWrite(led5, level >= 5);
 }
 
-// A note pulse
-void pulseLEDs() {
-  for (int i = 0; i < 2; i++) {
-    digitalWrite(led1, HIGH);
-    digitalWrite(led2, HIGH);
-    digitalWrite(led3, HIGH);
-    digitalWrite(led4, HIGH);
-    digitalWrite(led5, HIGH);
-    delay(60);
-
-    turnOffLEDs();
-    delay(60);
-  }
-}
-
-// B note fast blink
-void blinkLEDs() {
-  for (int i = 0; i < 4; i++) {
-    digitalWrite(led1, HIGH);
-    digitalWrite(led2, HIGH);
-    digitalWrite(led3, HIGH);
-    digitalWrite(led4, HIGH);
-    digitalWrite(led5, HIGH);
-    delay(30);
-
-    turnOffLEDs();
-    delay(30);
-  }
-}
-
 void turnOffLEDs() {
+
   digitalWrite(led1, LOW);
   digitalWrite(led2, LOW);
   digitalWrite(led3, LOW);
@@ -163,16 +188,30 @@ void turnOffLEDs() {
   digitalWrite(led5, LOW);
 }
 
-// MIDI Note ON
+// -------- MIDI --------
+
 void noteOn(int note) {
+
   Serial.write(0x90);
   Serial.write(note);
-  Serial.write(100);
+  Serial.write(110);
 }
 
-// MIDI Note OFF
 void noteOff(int note) {
+
   Serial.write(0x80);
   Serial.write(note);
   Serial.write(0);
+}
+
+void stopCurrentNote() {
+
+  if (lastNote != -1) {
+    noteOff(lastNote);
+  }
+
+  lastNote = -1;
+  stableNote = -1;
+
+  turnOffLEDs();
 }
