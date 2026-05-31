@@ -57,6 +57,12 @@ The ultrasonic sensor detects hand distance and maps different ranges to musical
 **Flow:**
 Arduino → Hairless MIDI → loopMIDI → LMMS → Speakers
 
+## Project Setup
+
+![Setup](images/setup.jpeg)
+
+![Updated Setup](images/setup2.0.jpeg)
+
 ## Future Improvements
 
 * Piano / Synth / Theremin modes
